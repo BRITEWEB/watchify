@@ -80,8 +80,7 @@ function watchify (b, opts) {
         if (!fwatcherFiles[file]) fwatcherFiles[file] = [];
         if (fwatcherFiles[file].indexOf(file) >= 0) return;
 
-        w = watch({
-          glob: file,
+        w = watch(file, {
           emit: 'one',
           maxListeners: 999,
           emitOnGlob: false
@@ -98,9 +97,8 @@ function watchify (b, opts) {
         if (!fwatchers[mfile]) fwatchers[mfile] = [];
         if (!fwatcherFiles[mfile]) fwatcherFiles[mfile] = [];
         if (fwatcherFiles[mfile].indexOf(file) >= 0) return;
-        
-        w = watch({
-          glob: file,
+
+        w = watch(file, {
           emit: 'one',
           maxListeners: 999,
           emitOnGlob: false
