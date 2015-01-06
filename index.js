@@ -1,7 +1,7 @@
 var through = require('through2');
 var fs = require('fs');
 var path = require('path');
-var chokidar = require('chokidar');
+var watch = require('gulp-watch');
 
 module.exports = watchify;
 module.exports.args = {
@@ -14,7 +14,7 @@ function watchify (b, opts) {
     var pkgcache = b._options.packageCache;
     var changingDeps = {};
     var pending = false;
-    
+
     b.on('dep', function (dep) {
         if (typeof dep.id === 'string') {
             cache[dep.id] = dep;
@@ -23,25 +23,25 @@ function watchify (b, opts) {
             watchFile(dep.file);
         }
     });
-    
+
     b.on('file', function (file) {
         watchFile(file);
     });
-    
+
     b.on('package', function (pkg) {
         watchFile(path.join(pkg.__dirname, 'package.json'));
     });
-    
+
     b.on('reset', reset);
     reset();
-    
+
     function reset () {
         var time = null;
         var bytes = 0;
         b.pipeline.get('record').on('end', function () {
             time = Date.now();
         });
-        
+
         b.pipeline.get('wrap').push(through(write, end));
         function write (buf, enc, next) {
             bytes += buf.length;
@@ -58,53 +58,61 @@ function watchify (b, opts) {
             this.push(null);
         }
     }
-    
+
     var fwatchers = {};
     var fwatcherFiles = {};
-    
+
     b.on('transform', function (tr, mfile) {
         tr.on('file', function (file) {
             watchDepFile(mfile, file);
         });
     });
-    
+
     function watchFile (file) {
         fs.lstat(file, function (err, stat) {
             if (err || stat.isDirectory()) return;
             watchFile_(file);
         });
     }
-    
+
     function watchFile_ (file) {
         if (!fwatchers[file]) fwatchers[file] = [];
         if (!fwatcherFiles[file]) fwatcherFiles[file] = [];
         if (fwatcherFiles[file].indexOf(file) >= 0) return;
-        
-        var w = chokidar.watch(file, {persistent: true});
-        w.setMaxListeners(0);
-        w.on('error', b.emit.bind(b, 'error'));
-        w.on('change', function () {
-            invalidate(file);
+
+        w = watch({
+          glob: file,
+          emit: 'one',
+          maxListeners: 999,
+          emitOnGlob: false
+        }, function () {
+          invalidate(file);
         });
+
+        w.on('error', b.emit.bind(b, 'error'));
         fwatchers[file].push(w);
         fwatcherFiles[file].push(file);
     }
-    
+
     function watchDepFile(mfile, file) {
         if (!fwatchers[mfile]) fwatchers[mfile] = [];
         if (!fwatcherFiles[mfile]) fwatcherFiles[mfile] = [];
         if (fwatcherFiles[mfile].indexOf(file) >= 0) return;
-
-        var w = chokidar.watch(file, {persistent: true});
-        w.setMaxListeners(0);
-        w.on('error', b.emit.bind(b, 'error'));
-        w.on('change', function () {
-            invalidate(mfile);
+        
+        w = watch({
+          glob: file,
+          emit: 'one',
+          maxListeners: 999,
+          emitOnGlob: false
+        }, function () {
+          invalidate(file);
         });
+
+        w.on('error', b.emit.bind(b, 'error'));
         fwatchers[mfile].push(w);
         fwatcherFiles[mfile].push(file);
     }
-    
+
     function invalidate (id) {
         if (cache) delete cache[id];
         if (fwatchers[id]) {
@@ -115,22 +123,22 @@ function watchify (b, opts) {
             delete fwatcherFiles[id];
         }
         changingDeps[id] = true
-        
+
         // wait for the disk/editor to quiet down first:
         if (!pending) setTimeout(function () {
             pending = false;
             b.emit('update', Object.keys(changingDeps));
             changingDeps = {};
-        
+
         }, opts.delay || 600);
         pending = true;
     }
-    
+
     b.close = function () {
         Object.keys(fwatchers).forEach(function (id) {
             fwatchers[id].forEach(function (w) { w.close() });
         });
     };
-    
+
     return b;
 }
