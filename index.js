@@ -81,7 +81,9 @@ function watchify (b, opts) {
         if (fwatcherFiles[file].indexOf(file) >= 0) return;
 
         w = watch(file, {
+          emit: 'one',
           maxListeners: 999,
+          emitOnGlob: false
         }, function () {
           invalidate(file);
         });
@@ -97,7 +99,9 @@ function watchify (b, opts) {
         if (fwatcherFiles[mfile].indexOf(file) >= 0) return;
 
         w = watch(file, {
+          emit: 'one',
           maxListeners: 999,
+          emitOnGlob: false
         }, function () {
           invalidate(file);
         });
